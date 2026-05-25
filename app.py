@@ -394,8 +394,14 @@ def status():
 
 # ─── Khởi chạy ───
 if __name__ == "__main__":
-    import webbrowser
-    port = 5000
-    print(f"\n  PDF Toolkit Web dang chay tai: http://localhost:{port}\n")
-    webbrowser.open(f"http://localhost:{port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    import os
+
+    port = int(os.environ.get("PORT", 5000))
+
+    print(f"\nPDF Toolkit Web dang chay tai cong {port}\n")
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
