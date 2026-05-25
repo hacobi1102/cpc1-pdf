@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Trạm Xử Lý PDF CPC1 – Gộp, Tách, Xuất ảnh, Chuyển Word OCR Tiếng Việt">
+  <title>Trạm Xử Lý PDF CPC1 v3.0</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ═══ Header ═══ -->
+<header class="header">
+  <h1>📄 Trạm Xử Lý PDF CPC1 <span class="version">v3.0 – Web</span></h1>
+  <div style="margin-left: auto; color: rgba(255,255,255,0.9); font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+    Nguyễn Văn Dũng <span style="color: #ff4d4f; font-size: 1.1rem;">❤️</span> 0978.777.191
+  </div>
+</header>
+
+<!-- ═══ Main Layout ═══ -->
+<div class="app-layout">
+
+  <!-- ─── Sidebar Left: Quản lý File ─── -->
+  <aside class="sidebar" id="sidebarLeft">
+    <div class="sidebar-title">📂 Quản lý File</div>
+
+    <!-- Upload Zone in Sidebar -->
+    <div class="upload-zone" id="dropZone"
+         ondragover="handleDragOver(event)"
+         ondragleave="handleDragLeave(event)"
+         ondrop="handleDrop(event)"
+         onclick="triggerUpload()">
+      <span class="upload-icon">📁</span>
+      <div class="upload-text">Kéo thả hoặc Click</div>
+      <div class="upload-hint">để thêm file PDF</div>
+    </div>
+    <input type="file" id="fileInput" multiple accept=".pdf" class="hidden" onchange="handleFiles(this.files)">
+
+    <button class="btn btn-outline" onclick="clearAll()">
+      <span class="icon">🧹</span><span class="label">Xóa sạch tất cả</span>
+    </button>
+
+    <div class="sidebar-divider"></div>
+
+    <button class="btn btn-warning" onclick="showAllPicker()">
+      <span class="icon">🗂️</span><span class="label">Xem tất cả trang</span>
+    </button>
+    <button class="btn btn-purple" onclick="doSplit()">
+      <span class="icon">✂️</span><span class="label">Tách file (đã chọn)</span>
+    </button>
+
+    <div style="margin-top: auto; padding-top: 20px; text-align: center;">
+      <img src="/static/cpc1-logo-200.png" alt="CPC1 Logo" style="max-width: 100%; height: auto; opacity: 0.85;">
+    </div>
+  </aside>
+
+  <!-- ─── Main Content ─── -->
+  <main class="main-content">
+
+    <!-- File List -->
+    <div class="file-list-card">
+      <div class="file-list-header">📋 Danh sách File PDF – kéo lên xuống chuyển vị trí, nhấp đúp để chọn trang</div>
+      <div id="fileListBody">
+        <div class="empty-state" id="emptyState" onclick="triggerUpload()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+          <span class="empty-icon">📂</span>
+          <p>Chưa có file nào. Click hoặc kéo thả file PDF vào đây!</p>
+        </div>
+        <table class="file-table hidden" id="fileTable">
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th>Tên File</th>
+              <th style="width:130px; white-space:nowrap;">Tổng trang</th>
+              <th>Trang được chọn</th>
+              <th style="width:50px"></th>
+            </tr>
+          </thead>
+          <tbody id="fileTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Thumbnail Area -->
+    <div class="thumb-area hidden" id="thumbArea">
+      <div class="thumb-header">
+        <span class="thumb-header-title" id="thumbTitle">Thumbnail</span>
+        <div class="thumb-header-actions">
+          <button class="btn-select-all" onclick="selectAllThumbs()">Chọn tất cả</button>
+          <button class="btn-deselect-all" onclick="deselectAllThumbs()">Bỏ chọn tất cả</button>
+          <button class="btn-confirm" onclick="confirmThumbSelection()">✅ Xác nhận</button>
+        </div>
+      </div>
+      <div id="thumbContent"></div>
+    </div>
+  </main>
+
+  <!-- ─── Sidebar Right: Xuất File ─── -->
+  <aside class="sidebar sidebar-right" id="sidebarRight">
+    <div class="sidebar-title">📤 Xuất File</div>
+
+    <button class="btn" onclick="doMerge()">
+      <span class="icon">🚀</span><span class="label">GỘP CÁC FILE</span>
+    </button>
+    <button class="btn btn-image" onclick="doImages()">
+      <span class="icon">🖼️</span><span class="label">XUẤT THÀNH ẢNH</span>
+    </button>
+    <button class="btn btn-word" onclick="doWord()">
+      <span class="icon">📝</span><span class="label">XUẤT SANG WORD</span>
+    </button>
+    <button class="btn btn-excel" onclick="doExcel()">
+      <span class="icon">📊</span><span class="label">XUẤT SANG EXCEL</span>
+    </button>
+    <button class="btn btn-compress" onclick="doCompress()">
+      <span class="icon">🗜️</span><span class="label">NÉN FILE PDF</span>
+    </button>
+
+    <div class="sidebar-divider"></div>
+
+    <label class="toggle-group">
+      <input type="checkbox" id="ocrToggle">
+      <span class="toggle-label">Bật OCR Tiếng Việt</span>
+    </label>
+    <div class="toggle-hint" style="margin-bottom: 12px;">Chỉ bật khi file là ảnh chụp/scan</div>
+
+    <label class="toggle-group">
+      <input type="checkbox" id="compressToggle">
+      <span class="toggle-label">Tối ưu & Nén dung lượng</span>
+    </label>
+    <div class="toggle-hint">Tự động nén khi Gộp/Tách file</div>
+  </aside>
+
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="loading-card">
+    <div class="spinner"></div>
+    <p id="loadingText">Đang xử lý…</p>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
