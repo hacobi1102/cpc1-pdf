@@ -1,8 +1,11 @@
 Flask
+gunicorn
 pypdf
+PyMuPDF
 pytesseract
 Pillow
-gunicorn
-PyMuPDF
 pdfplumber
 pandas
+openpyxl
+python-docx
+pdf2docx
