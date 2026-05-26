@@ -3,3 +3,6 @@ pypdf
 pytesseract
 Pillow
 gunicorn
+PyMuPDF
+pdfplumber
+pandas
