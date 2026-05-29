@@ -678,6 +678,11 @@ body {
   /* 3. Main Content */
   .main-content {
     padding: 16px 12px;
+    overflow: visible; /* Cực kỳ quan trọng để position: sticky hoạt động trên mobile */
+  }
+
+  .thumb-area {
+    overflow: visible; /* Cực kỳ quan trọng để position: sticky hoạt động trên mobile */
   }
 
   /* Bảng danh sách file có thể cuộn ngang */
@@ -701,6 +706,10 @@ body {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+    position: sticky;
+    top: var(--header-h); /* Ghim ngay dưới thanh Header chính (60px) */
+    z-index: 90;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Đổ bóng nhẹ khi cuộn */
   }
   
   .thumb-header-actions {
