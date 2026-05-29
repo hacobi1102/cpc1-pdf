@@ -627,3 +627,176 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS (iPhone 15 Pro Max & similar)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  /* 1. Đổi Layout thành xếp dọc */
+  .header .version,
+  label[for="ocrMode"] {
+    display: none !important;
+  }
+  
+  .app-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - var(--header-h));
+    padding-bottom: 20px; /* Đã gỡ bỏ fixed bottom bar nên không cần padding lớn */
+  }
+
+  /* 2. Cột trái (Quản lý File) chiếm full màn hình ở trên */
+  .sidebar {
+    width: 100%;
+    min-width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+  }
+  
+  .sidebar-title {
+    text-align: center;
+    font-size: 0.95rem;
+  }
+
+  /* Căn giữa các nút trong Quản lý File */
+  #sidebarLeft .btn {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 12px;
+  }
+  
+  #sidebarLeft .btn .icon {
+    width: auto;
+  }
+
+  /* 3. Main Content */
+  .main-content {
+    padding: 16px 12px;
+  }
+
+  /* Bảng danh sách file có thể cuộn ngang */
+  #fileListBody {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .file-table {
+    min-width: 550px;
+  }
+
+  /* Lưới Thumbnail thu nhỏ lại để vừa màn hình điện thoại (hiển thị 3-4 ô/hàng) */
+  .thumb-grid, .file-section-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .thumb-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .thumb-header-actions {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  
+  .btn-select-all, .btn-deselect-all, .btn-confirm {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    flex: 1;
+    text-align: center;
+  }
+  .btn-confirm {
+    margin-left: 0;
+  }
+
+  /* 4. Cột phải (Xuất File) xếp ở cuối trang */
+  #sidebarRight {
+    position: relative;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    box-shadow: none;
+    padding: 16px 20px;
+    margin: 0;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Ẩn bớt các dải phân cách và tiêu đề không cần thiết */
+  #sidebarRight .sidebar-title,
+  #sidebarRight .sidebar-divider,
+  #sidebarRight .toggle-hint {
+    display: none;
+  }
+
+  /* Cấu hình OCR và nút Nén chia đôi hàng đầu tiên */
+  #sidebarRight > div:not(.sidebar-divider):not(.sidebar-title) {
+    width: calc(50% - 4px);
+    margin-bottom: 0 !important;
+  }
+  
+  #sidebarRight .toggle-group {
+    width: calc(50% - 4px);
+    justify-content: center;
+    padding: 9px 4px;
+    margin-bottom: 0;
+  }
+  
+  #sidebarRight .toggle-group .toggle-label {
+    font-size: 0.75rem;
+  }
+
+  /* Các nút bấm (Gộp, Tách, Hình, Word, Excel) */
+  #sidebarRight .btn {
+    width: calc(50% - 4px); /* Dàn thành 2 cột */
+    padding: 10px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+  }
+  
+  #sidebarRight .btn .icon {
+    font-size: 1.3rem;
+  }
+  
+  #sidebarRight .btn .label {
+    font-size: 0.65rem;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  /* Nút Gộp File (QUAN TRỌNG NHẤT) to nhất */
+  #sidebarRight .btn[onclick="doMerge()"] {
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+    padding: 12px;
+    font-size: 1rem;
+    background: linear-gradient(135deg, var(--primary), #02898b);
+  }
+  #sidebarRight .btn[onclick="doMerge()"] .icon {
+    font-size: 1.5rem;
+  }
+  #sidebarRight .btn[onclick="doMerge()"] .label {
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+}
