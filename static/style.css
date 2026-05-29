@@ -67,6 +67,9 @@ body {
   margin-left: 12px;
   font-weight: 400;
 }
+.header-logo {
+  display: none; /* Ẩn mặc định trên máy tính */
+}
 
 /* ─── Layout ─── */
 .app-layout {
@@ -628,14 +631,39 @@ body {
 ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
 
+/* ─── Mobile Footer (Hidden by default) ─── */
+.mobile-footer {
+  display: none;
+}
+
 /* ═══════════════════════════════════════════════════════════
    MOBILE RESPONSIVENESS (iPhone 15 Pro Max & similar)
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
   /* 1. Đổi Layout thành xếp dọc */
   .header .version,
-  label[for="ocrMode"] {
+  label[for="ocrMode"],
+  .contact-info,
+  .sidebar-logo {
     display: none !important;
+  }
+  
+  .header-logo {
+    display: block !important;
+    height: 32px;
+    margin-left: auto;
+  }
+  
+  .mobile-footer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    padding: 20px 10px 40px; /* Padding dưới dư ra một chút cho thoáng */
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: transparent;
   }
   
   .app-layout {
