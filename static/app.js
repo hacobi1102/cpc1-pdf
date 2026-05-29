@@ -486,14 +486,19 @@ async function doWord() {
   if (!f) return;
   const pages = [...f.selected_pages].sort((a, b) => a - b);
   if (pages.length === 0) return toast("Không có trang nào được chọn!", "warning");
-  const ocr = $("#ocrToggle").checked;
+  const ocrModeElement = $("#ocrMode");
+  const ocr_mode = ocrModeElement ? ocrModeElement.value : "none";
 
-  showLoading(`Đang chuyển ${pages.length} trang sang Word${ocr ? " (OCR)" : ""}…`);
+  let modeText = "";
+  if (ocr_mode === "basic") modeText = " (OCR Thường)";
+  if (ocr_mode === "advanced") modeText = " (OCR Nâng cao)";
+
+  showLoading(`Đang chuyển ${pages.length} trang sang Word${modeText}…`);
   try {
     const resp = await fetch("/api/word", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: f.file_id, pages, ocr }),
+      body: JSON.stringify({ file_id: f.file_id, pages, ocr_mode }),
     });
     if (!resp.ok) throw new Error((await resp.json()).error);
     const blob = await resp.blob();
