@@ -74,12 +74,12 @@ async function handleFiles(fileList) {
   const formData = new FormData();
   let count = 0;
   for (const f of fileList) {
-    if (f.name.toLowerCase().endsWith(".pdf")) {
+    if (f.name.toLowerCase().match(/\.(pdf|png|jpg|jpeg)$/i)) {
       formData.append("files", f);
       count++;
     }
   }
-  if (count === 0) return toast("Chỉ hỗ trợ file PDF!", "warning");
+  if (count === 0) return toast("Chỉ hỗ trợ file PDF và Hình ảnh!", "warning");
 
   showLoading("Đang tải lên…");
   try {
