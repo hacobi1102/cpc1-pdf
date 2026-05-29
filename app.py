@@ -71,20 +71,36 @@ def index():
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
-    """Upload một hoặc nhiều file PDF."""
+    """Upload một hoặc nhiều file PDF hoặc Hình ảnh."""
     results = []
     for f in request.files.getlist("files"):
-        if not f.filename or not f.filename.lower().endswith(".pdf"):
+        if not f.filename:
             continue
+        fname_lower = f.filename.lower()
+        if not (fname_lower.endswith(".pdf") or fname_lower.endswith(".png") or fname_lower.endswith(".jpg") or fname_lower.endswith(".jpeg")):
+            continue
+            
         file_id = uuid.uuid4().hex[:10]
         path = os.path.join(UPLOAD_DIR, f"{file_id}.pdf")
-        f.save(path)
-        try:
-            reader = PdfReader(path)
-            total  = len(reader.pages)
-        except Exception as e:
-            os.remove(path)
-            return jsonify({"error": f"Lỗi đọc {f.filename}: {e}"}), 400
+        
+        if fname_lower.endswith(".pdf"):
+            f.save(path)
+            try:
+                reader = PdfReader(path)
+                total  = len(reader.pages)
+            except Exception as e:
+                os.remove(path)
+                return jsonify({"error": f"Lỗi đọc {f.filename}: {e}"}), 400
+        else:
+            # Là file ảnh -> Chuyển thành PDF 1 trang
+            try:
+                img = Image.open(f)
+                img_converted = img.convert('RGB')
+                img_converted.save(path, "PDF", resolution=100.0)
+                total = 1
+            except Exception as e:
+                return jsonify({"error": f"Lỗi chuyển ảnh {f.filename}: {e}"}), 400
+
         files_db[file_id] = {
             "path":        path,
             "name":        f.filename,
