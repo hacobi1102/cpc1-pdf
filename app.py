@@ -270,62 +270,138 @@ def to_word():
     """Chuyển các trang thành Word (.docx), hỗ trợ OCR."""
     if not HAS_FITZ:
         return jsonify({"error": "Cần cài PyMuPDF: pip install PyMuPDF"}), 500
-    data = request.json  # {file_id, pages: [0,1,...], ocr: true}
+    data = request.json
     info = files_db.get(data["file_id"])
     if not info:
         return jsonify({"error": "File not found"}), 404
-    use_ocr = data.get("ocr", True)
-    if use_ocr and not HAS_OCR:
+
+    ocr_mode = data.get("ocr_mode")
+    if ocr_mode is None:
+        use_ocr = data.get("ocr", False)
+        ocr_mode = "advanced" if use_ocr else "none"
+
+    if ocr_mode in ["basic", "advanced"] and not HAS_OCR:
         return jsonify({"error": "Cần cài pytesseract: pip install pytesseract"}), 500
 
     base = os.path.splitext(info["name"])[0]
     buf = io.BytesIO()
+    import tempfile
 
-    if not use_ocr:
-        # Use pdf2docx to preserve formatting and tables
+    if ocr_mode == "none":
         try:
             from pdf2docx import Converter
         except ImportError:
-            return jsonify({"error": "Đang cài đặt thư viện hỗ trợ (pdf2docx), vui lòng chờ chút rồi thử lại."}), 500
-
-        import tempfile
+            return jsonify({"error": "Thiếu thư viện pdf2docx"}), 500
+            
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
             tmp_docx = tmp.name
-
         try:
             cv = Converter(info["path"])
             cv.convert(tmp_docx, pages=data["pages"])
             cv.close()
-
             with open(tmp_docx, "rb") as f:
                 buf.write(f.read())
         except Exception as e:
             return jsonify({"error": f"Lỗi chuyển Word: {e}"}), 500
         finally:
             if os.path.exists(tmp_docx):
-                try:
-                    os.remove(tmp_docx)
-                except OSError:
-                    pass
-    else:
-        # OCR Mode: Extract plain text only
-        from docx import Document
-        doc      = fitz.open(info["path"])
-        word_doc = Document()
-        pages    = data["pages"]
+                try: os.remove(tmp_docx)
+                except: pass
 
+    elif ocr_mode == "basic":
+        from docx import Document
+        doc = fitz.open(info["path"])
+        word_doc = Document()
+        pages = data["pages"]
         for idx, i in enumerate(pages):
             if 0 <= i < len(doc):
                 page = doc[i]
-                pix  = page.get_pixmap(dpi=200, alpha=False)
-                img  = Image.open(io.BytesIO(pix.tobytes("png")))
+                pix = page.get_pixmap(dpi=200, alpha=False)
+                img = Image.open(io.BytesIO(pix.tobytes("png")))
                 text = pytesseract.image_to_string(img, lang="vie+eng")
                 word_doc.add_paragraph(text)
                 if idx < len(pages) - 1:
                     word_doc.add_page_break()
-
         doc.close()
         word_doc.save(buf)
+
+    elif ocr_mode == "advanced":
+        try:
+            import ocrmypdf
+            from pdf2docx import Converter
+        except ImportError:
+            return jsonify({"error": "Thiếu thư viện ocrmypdf hoặc pdf2docx"}), 500
+            
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_in, \
+             tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_out, \
+             tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp_docx:
+            tmp_in_path = tmp_in.name
+            tmp_out_path = tmp_out.name
+            tmp_docx_path = tmp_docx.name
+
+        try:
+            doc = fitz.open(info["path"])
+            doc.select(data["pages"])
+            doc.save(tmp_in_path)
+            doc.close()
+
+            ocrmypdf.ocr(
+                tmp_in_path, 
+                tmp_out_path, 
+                language="vie+eng", 
+                deskew=True, 
+                force_ocr=True, 
+                optimize=1
+            )
+
+            # --- SỬA LỖI pdf2docx RA ẢNH ---
+            # ocrmypdf tạo ra text ẩn (Render mode 3) và giữ nguyên ảnh nền.
+            # pdf2docx mặc định bỏ qua text ẩn nên chỉ trích xuất được ảnh nền.
+            # Ta cần xóa ảnh nền và chuyển text ẩn thành text hiện (0 Tr).
+            doc_fix = fitz.open(tmp_out_path)
+            for page in doc_fix:
+                for item in page.get_images():
+                    page.delete_image(item[0])
+            
+            for xref in range(1, doc_fix.xref_length()):
+                stream = doc_fix.xref_stream(xref)
+                if stream and b"3 Tr" in stream:
+                    stream = stream.replace(b"3 Tr", b"0 Tr")
+                    doc_fix.update_stream(xref, stream)
+            
+            fixed_pdf_path = tmp_out_path + "_fixed.pdf"
+            doc_fix.save(fixed_pdf_path)
+            doc_fix.close()
+            # ---------------------------------
+
+            cv = Converter(fixed_pdf_path)
+            cv.convert(tmp_docx_path)
+            cv.close()
+
+            with open(tmp_docx_path, "rb") as f:
+                buf.write(f.read())
+        except Exception as e:
+            print(f"OCRmyPDF failed: {e}. Fallback to basic OCR.")
+            buf = io.BytesIO()
+            from docx import Document
+            doc = fitz.open(info["path"])
+            word_doc = Document()
+            for idx, i in enumerate(data["pages"]):
+                if 0 <= i < len(doc):
+                    page = doc[i]
+                    pix = page.get_pixmap(dpi=200, alpha=False)
+                    img = Image.open(io.BytesIO(pix.tobytes("png")))
+                    text = pytesseract.image_to_string(img, lang="vie+eng")
+                    word_doc.add_paragraph(text)
+                    if idx < len(data["pages"]) - 1:
+                        word_doc.add_page_break()
+            doc.close()
+            word_doc.save(buf)
+        finally:
+            for path in [tmp_in_path, tmp_out_path, tmp_docx_path, tmp_out_path + "_fixed.pdf"]:
+                if os.path.exists(path):
+                    try: os.remove(path)
+                    except: pass
 
     buf.seek(0)
     return send_file(buf, as_attachment=True,
@@ -394,14 +470,16 @@ def status():
 
 # ─── Khởi chạy ───
 if __name__ == "__main__":
-    import os
-
-    port = int(os.environ.get("PORT", 5000))
-
-    print(f"\nPDF Toolkit Web dang chay tai cong {port}\n")
-
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+    import threading
+    import webbrowser
+    
+    port_env = os.environ.get("PORT")
+    port = int(port_env) if port_env else 5000
+    
+    if port_env is None:
+        print(f"\n  PDF Toolkit Web đang chạy tại: http://localhost:{port}\n")
+        threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()
+    else:
+        print(f"\n  Production server starting on port {port}\n")
+        
+    app.run(host="0.0.0.0", port=port, debug=False)
