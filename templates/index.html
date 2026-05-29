@@ -33,11 +33,11 @@
          onclick="triggerUpload()">
       <span class="upload-icon">📁</span>
       <div class="upload-text">Kéo thả hoặc Click</div>
-      <div class="upload-hint">để thêm file PDF</div>
+      <div class="upload-hint">để thêm file PDF, Hình ảnh</div>
     </div>
-    <input type="file" id="fileInput" multiple accept=".pdf" class="hidden" onchange="handleFiles(this.files)">
+    <input type="file" id="fileInput" multiple accept=".pdf, image/png, image/jpeg, image/jpg" class="hidden" onchange="handleFiles(this.files)">
 
-    <button class="btn btn-outline" onclick="clearAll()">
+    <button class="btn btn-danger" onclick="clearAll()">
       <span class="icon">🧹</span><span class="label">Xóa sạch tất cả</span>
     </button>
 
@@ -60,11 +60,11 @@
 
     <!-- File List -->
     <div class="file-list-card">
-      <div class="file-list-header">📋 Danh sách File PDF – kéo lên xuống chuyển vị trí, nhấp đúp để chọn trang</div>
+      <div class="file-list-header">📋 Danh sách File – kéo lên xuống chuyển vị trí, nhấp đúp để chọn trang</div>
       <div id="fileListBody">
         <div class="empty-state" id="emptyState" onclick="triggerUpload()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
           <span class="empty-icon">📂</span>
-          <p>Chưa có file nào. Click hoặc kéo thả file PDF vào đây!</p>
+          <p>Chưa có file nào. Click hoặc kéo thả file PDF, Hình ảnh vào đây!</p>
         </div>
         <table class="file-table hidden" id="fileTable">
           <thead>
@@ -100,10 +100,10 @@
     <div class="sidebar-title">📤 Xuất File</div>
 
     <button class="btn" onclick="doMerge()">
-      <span class="icon">🚀</span><span class="label">GỘP CÁC FILE</span>
+      <span class="icon">🚀</span><span class="label">GỘP XUẤT FILE PDF</span>
     </button>
     <button class="btn btn-image" onclick="doImages()">
-      <span class="icon">🖼️</span><span class="label">XUẤT THÀNH ẢNH</span>
+      <span class="icon">🖼️</span><span class="label">XUẤT SANG ẢNH</span>
     </button>
     <button class="btn btn-word" onclick="doWord()">
       <span class="icon">📝</span><span class="label">XUẤT SANG WORD</span>
@@ -151,6 +151,8 @@
   Nguyễn Văn Dũng <span style="color: #ff4d4f; font-size: 1.1rem;">❤️</span> 0978.777.191
 </div>
 
+<!-- Polyfill hỗ trợ Drag & Drop trên màn hình cảm ứng điện thoại -->
+<script src="https://unpkg.com/drag-drop-touch"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
