@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="Trạm Xử Lý PDF CPC1 – Gộp, Tách, Xuất ảnh, Chuyển Word OCR Tiếng Việt">
   <title>Trạm Xử Lý PDF CPC1 v3.0</title>
   <link rel="stylesheet" href="/static/style.css">
@@ -116,11 +116,14 @@
 
     <div class="sidebar-divider"></div>
 
-    <label class="toggle-group">
-      <input type="checkbox" id="ocrToggle">
-      <span class="toggle-label">Bật OCR Tiếng Việt</span>
-    </label>
-    <div class="toggle-hint" style="margin-bottom: 12px;">Chỉ bật khi file là ảnh chụp/scan</div>
+    <div style="margin-bottom: 12px;">
+      <label for="ocrMode" style="display:block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem;">Cấu hình xuất Word:</label>
+      <select id="ocrMode" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text-primary); font-family: inherit; font-size: 0.9rem;">
+        <option value="none">⚡ Mặc định (Nhanh)</option>
+        <option value="basic">📝 Xuất chữ (OCR Thường)</option>
+        <option value="advanced">🌟 Giữ định dạng (OCR Cao)</option>
+      </select>
+    </div>
 
     <label class="toggle-group">
       <input type="checkbox" id="compressToggle">
