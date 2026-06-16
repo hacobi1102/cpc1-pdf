@@ -1,0 +1,12 @@
+[phases.setup]
+nixPkgs = [
+    "tesseract",
+    "tesseract-data-eng",
+    "tesseract-data-vie",
+    "ghostscript",
+    "unpaper",
+    "pngquant"
+]
+
+[start]
+cmd = "gunicorn app:app"

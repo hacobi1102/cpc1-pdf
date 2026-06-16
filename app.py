@@ -488,23 +488,11 @@ def status():
 if __name__ == "__main__":
     import threading
     import webbrowser
-    import os
-    import socket # Thư viện kiểm tra cổng
-
+    
     port_env = os.environ.get("PORT")
     port = int(port_env) if port_env else 5000
     
-    # Hàm kiểm tra xem cổng có bị chiếm hay không
-    def is_port_in_use(p):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(('localhost', p)) == 0
-
-    # Nếu cổng 5000 bận, tự động tăng lên cho đến khi tìm được cổng trống
     if port_env is None:
-        while is_port_in_use(port):
-            print(f"Cổng {port} đã bị chiếm, đang thử cổng {port + 1}...")
-            port += 1
-            
         print(f"\n  PDF Toolkit Web đang chạy tại: http://localhost:{port}\n")
         threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()
     else:
