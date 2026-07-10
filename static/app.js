@@ -6,6 +6,7 @@
 // ─── State ───
 const state = {
   files: [],          // [{file_id, name, total_pages, selected_pages: Set}]
+  mergeOrder: [],     // [{file_id, pageIdx}] – thứ tự trang khi gộp (cập nhật sau Xác nhận)
   selectedIndex: -1,  // index trong state.files của file đang được chọn
   thumbMode: null,    // null | "single" | "all"
 };
@@ -94,6 +95,7 @@ async function handleFiles(fileList) {
         selected_pages: new Set(Array.from({ length: r.total_pages }, (_, i) => i)),
       });
     }
+    state.mergeOrder = []; // Reset thứ tự sắp xếp khi thêm file mới
     renderFileList();
     toast(`✅ Đã thêm ${results.length} file!`, "success");
   } catch (e) {
@@ -156,6 +158,7 @@ function renderFileList() {
       state.selectedIndex = state.files.indexOf(movedItem === selectedFile ? movedItem : state.files.find(f => f === selectedFile));
       
       draggedFileIndex = null;
+      state.mergeOrder = []; // Reset thứ tự sắp xếp trang khi đổi thứ tự file
       renderFileList();
     };
     tr.ondragend = (e) => {
@@ -194,6 +197,7 @@ async function deleteFileIdx(idx) {
   }
   
   if (state.files.length === 0) state.selectedIndex = -1;
+  state.mergeOrder = []; // Reset thứ tự sắp xếp khi xóa file
   renderFileList();
   hideThumbArea();
   toast("Đã xóa file.", "success");
@@ -205,6 +209,7 @@ async function clearAll() {
   await fetch("/api/files/clear", { method: "DELETE" });
   state.files = [];
   state.selectedIndex = -1;
+  state.mergeOrder = []; // Reset thứ tự sắp xếp
   renderFileList();
   hideThumbArea();
   toast("Đã xóa tất cả.", "success");
@@ -288,6 +293,10 @@ function createThumbCard(fileId, pageIdx, checked, borderColor, fileIdx) {
   const card = document.createElement("div");
   card.className = `thumb-card ${checked ? "checked" : "unchecked"}`;
   if (borderColor && checked) card.style.borderColor = borderColor;
+  card.draggable = true;
+  card.dataset.fileId = fileId;
+  card.dataset.pageIdx = pageIdx;
+  if (fileIdx !== undefined) card.dataset.fileIdx = fileIdx;
 
   const img = document.createElement("img");
   img.src = `/api/thumb/${fileId}/${pageIdx}`;
@@ -309,12 +318,30 @@ function createThumbCard(fileId, pageIdx, checked, borderColor, fileIdx) {
 
   label.appendChild(cb);
   label.appendChild(txt);
+
+  // Nút ▲▼ di chuyển trang
+  const moveBox = document.createElement("div");
+  moveBox.className = "thumb-move-btns";
+  const btnUp = document.createElement("button");
+  btnUp.className = "thumb-move-btn";
+  btnUp.textContent = "▲";
+  btnUp.title = "Di chuyển lên";
+  btnUp.addEventListener("click", (e) => { e.stopPropagation(); moveThumbCard(card, -1); });
+  const btnDown = document.createElement("button");
+  btnDown.className = "thumb-move-btn";
+  btnDown.textContent = "▼";
+  btnDown.title = "Di chuyển xuống";
+  btnDown.addEventListener("click", (e) => { e.stopPropagation(); moveThumbCard(card, 1); });
+  moveBox.appendChild(btnUp);
+  moveBox.appendChild(btnDown);
+
   card.appendChild(img);
   card.appendChild(label);
+  card.appendChild(moveBox);
 
   // Toggle on click anywhere on card
   card.addEventListener("click", (e) => {
-    if (e.target === cb) return; // checkbox handles itself
+    if (e.target === cb || e.target.classList.contains("thumb-move-btn")) return;
     cb.checked = !cb.checked;
     updateCardState(card, cb, borderColor);
   });
@@ -322,7 +349,60 @@ function createThumbCard(fileId, pageIdx, checked, borderColor, fileIdx) {
     updateCardState(card, cb, borderColor);
   });
 
+  // Drag reorder events
+  card.addEventListener("dragstart", (e) => {
+    card.classList.add("drag-reorder");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", "thumb-reorder");
+    _draggedThumb = card;
+  });
+  card.addEventListener("dragend", () => {
+    card.classList.remove("drag-reorder");
+    _draggedThumb = null;
+    // Xóa tất cả highlight
+    document.querySelectorAll(".drag-over-reorder").forEach(el => el.classList.remove("drag-over-reorder"));
+  });
+  card.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    if (_draggedThumb && _draggedThumb !== card) {
+      card.classList.add("drag-over-reorder");
+    }
+  });
+  card.addEventListener("dragleave", () => {
+    card.classList.remove("drag-over-reorder");
+  });
+  card.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    card.classList.remove("drag-over-reorder");
+    if (!_draggedThumb || _draggedThumb === card) return;
+    // Chèn card đang kéo vào trước card đích
+    const grid = card.parentElement;
+    if (!grid) return;
+    grid.insertBefore(_draggedThumb, card);
+    _draggedThumb = null;
+  });
+
   return card;
+}
+
+// Biến tạm cho drag reorder thumbnail
+let _draggedThumb = null;
+
+// Hàm di chuyển card lên/xuống bằng nút ▲▼
+function moveThumbCard(card, direction) {
+  const grid = card.parentElement;
+  if (!grid) return;
+  const cards = [...grid.children];
+  const idx = cards.indexOf(card);
+  if (direction === -1 && idx > 0) {
+    // Di chuyển lên: chèn trước phần tử phía trên
+    grid.insertBefore(card, cards[idx - 1]);
+  } else if (direction === 1 && idx < cards.length - 1) {
+    // Di chuyển xuống: chèn sau phần tử phía dưới
+    const nextNext = cards[idx + 2] || null;
+    grid.insertBefore(card, nextNext);
+  }
 }
 
 function updateCardState(card, cb, borderColor) {
@@ -383,6 +463,19 @@ function confirmThumbSelection() {
       }
     });
   }
+
+  // ── Xây dựng mergeOrder từ thứ tự DOM thực tế (sau khi kéo thả / di chuyển) ──
+  state.mergeOrder = [];
+  document.querySelectorAll("#thumbContent .thumb-card").forEach(card => {
+    const cb = card.querySelector("input[type=checkbox]");
+    if (cb && cb.checked) {
+      state.mergeOrder.push({
+        file_id: card.dataset.fileId,
+        pageIdx: parseInt(card.dataset.pageIdx),
+      });
+    }
+  });
+
   renderFileList();
   hideThumbArea();
   toast("✅ Đã cập nhật trang được chọn!", "success");
@@ -400,13 +493,37 @@ function getSelectedFile() {
 async function doMerge() {
   if (state.files.length === 0) return toast("Chưa có file nào!", "warning");
   const compress = $("#compressToggle")?.checked || false;
-  const payload = {
-    compress: compress,
-    files: state.files.map(f => ({
-      file_id: f.file_id,
-      pages: [...f.selected_pages].sort((a, b) => a - b),
-    })),
-  };
+
+  let payload;
+
+  if (state.mergeOrder.length > 0) {
+    // ── Dùng mergeOrder (thứ tự do người dùng sắp xếp) ──
+    // Gom nhóm theo cụm liên tiếp cùng file_id, giữ nguyên thứ tự xen kẽ
+    // VD: A-1, A-2, B-1, A-3 → [{A, [1,2]}, {B, [1]}, {A, [3]}]
+    const chunks = [];
+    for (const item of state.mergeOrder) {
+      const last = chunks[chunks.length - 1];
+      if (last && last.file_id === item.file_id) {
+        last.pages.push(item.pageIdx);
+      } else {
+        chunks.push({ file_id: item.file_id, pages: [item.pageIdx] });
+      }
+    }
+    payload = {
+      compress,
+      files: chunks,
+    };
+  } else {
+    // ── Fallback: thứ tự mặc định (file theo danh sách, trang sorted) ──
+    payload = {
+      compress,
+      files: state.files.map(f => ({
+        file_id: f.file_id,
+        pages: [...f.selected_pages].sort((a, b) => a - b),
+      })),
+    };
+  }
+
   const totalPages = payload.files.reduce((s, f) => s + f.pages.length, 0);
   if (totalPages === 0) return toast("Không có trang nào được chọn!", "warning");
 

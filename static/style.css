@@ -520,6 +520,57 @@ body {
   cursor: pointer;
 }
 
+/* ─── Nút ▲▼ Di chuyển trang ─── */
+.thumb-move-btns {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 5;
+}
+.thumb-card:hover .thumb-move-btns {
+  opacity: 1;
+}
+/* Trên mobile luôn hiển thị nút */
+@media (max-width: 900px) {
+  .thumb-move-btns {
+    opacity: 1;
+  }
+}
+.thumb-move-btn {
+  width: 24px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 0.65rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  line-height: 1;
+}
+.thumb-move-btn:hover {
+  background: var(--primary);
+}
+
+/* ─── Hiệu ứng kéo thả sắp xếp trang ─── */
+.thumb-card.drag-reorder {
+  opacity: 0.4;
+  border: 2px dashed var(--primary) !important;
+  transform: scale(0.95);
+}
+.thumb-card.drag-over-reorder {
+  border-left: 4px solid var(--primary) !important;
+  box-shadow: -4px 0 12px rgba(3,170,173,0.4);
+}
+
 /* ─── Checkbox toggle (OCR) ─── */
 .toggle-group {
   display: flex;
