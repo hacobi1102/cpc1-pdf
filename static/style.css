@@ -162,30 +162,7 @@ body {
 .btn-compress:hover { background: #0891b2; box-shadow: 0 3px 10px rgba(6,182,212,0.3); }
 .btn-image { background: #ec4899; color: white !important; border: none; }
 .btn-image:hover { background: #db2777; box-shadow: 0 3px 10px rgba(236,72,153,0.3); }
-.btn-confirm {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: linear-gradient(135deg, var(--primary), #02898b) !important;
-  color: #fff !important;
-  border: none !important;
-  font-weight: 700;
-  font-family: inherit;
-  padding: 9px 28px;
-  box-shadow: 0 4px 15px rgba(3,170,173,0.35);
-  font-size: 0.95rem;
-  border-radius: 24px;
-  margin-left: 12px;
-  white-space: nowrap;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-}
-.btn-confirm:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(3,170,173,0.5);
-  background: linear-gradient(135deg, #04c2c5, var(--primary)) !important;
-}
+
 .btn-danger  { background: var(--danger); }
 .btn-danger:hover  { background: #c53030; box-shadow: 0 3px 10px rgba(229,62,62,0.3); }
 .btn-outline {
@@ -291,7 +268,6 @@ body {
 }
 .file-table tbody tr.selected {
   background: var(--primary-light);
-  border-left: 3px solid var(--primary);
 }
 .file-table tbody tr.dragging {
   opacity: 0.6;
@@ -405,25 +381,70 @@ body {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
 }
+/* ─── Thumb Picker Buttons – cùng base, khác màu ─── */
+.btn-select-all,
+.btn-deselect-all,
+.btn-cancel-thumb,
+.btn-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  border: 1.5px solid transparent;
+}
+/* Chọn tất cả – primary ghost */
 .btn-select-all {
-  background: rgba(3, 170, 173, 0.1);
+  background: transparent;
   color: var(--primary);
-  border: 1px solid rgba(3, 170, 173, 0.3);
+  border-color: var(--primary);
 }
 .btn-select-all:hover {
-  background: rgba(3, 170, 173, 0.18);
+  background: var(--primary-light);
   transform: translateY(-1px);
 }
+/* Bỏ chọn – neutral ghost */
 .btn-deselect-all {
-  background: #f1f5f9;
+  background: transparent;
   color: #64748b;
-  border: 1px solid #e2e8f0;
+  border-color: #cbd5e1;
 }
 .btn-deselect-all:hover {
-  background: #e2e8f0;
-  color: #475569;
+  background: #f1f5f9;
+  border-color: #94a3b8;
   transform: translateY(-1px);
 }
+/* Hủy – danger ghost */
+.btn-cancel-thumb {
+  background: transparent;
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+.btn-cancel-thumb:hover {
+  background: #fff5f5;
+  border-color: #ef4444;
+  transform: translateY(-1px);
+}
+/* Xác nhận – solid primary */
+.btn-confirm {
+  background: linear-gradient(135deg, var(--primary), #02898b);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(3,170,173,0.3);
+}
+.btn-confirm:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 16px rgba(3,170,173,0.45);
+}
+
 
 .thumb-grid {
   display: grid;
@@ -771,7 +792,7 @@ body {
   }
   
   .file-table {
-    min-width: 550px;
+    min-width: 590px;
   }
 
   /* Lưới Thumbnail thu nhỏ lại để vừa màn hình điện thoại (hiển thị 3-4 ô/hàng) */
@@ -798,7 +819,7 @@ body {
     gap: 6px;
   }
   
-  .btn-select-all, .btn-deselect-all, .btn-confirm {
+  .btn-select-all, .btn-deselect-all, .btn-cancel-thumb, .btn-confirm {
     padding: 8px 12px;
     font-size: 0.75rem;
     flex: 1;
