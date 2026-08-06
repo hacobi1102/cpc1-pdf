@@ -92,13 +92,22 @@ def upload():
                 os.remove(path)
                 return jsonify({"error": f"Lỗi đọc {f.filename}: {e}"}), 400
         else:
-            # Là file ảnh -> Chuyển thành PDF 1 trang
+            # Là file ảnh -> Lưu tạm rồi chuyển thành PDF 1 trang
             try:
-                img = Image.open(f)
+                temp_img_path = os.path.join(UPLOAD_DIR, f"{file_id}_img{os.path.splitext(fname_lower)[1]}")
+                f.save(temp_img_path)
+                img = Image.open(temp_img_path)
                 img_converted = img.convert('RGB')
                 img_converted.save(path, "PDF", resolution=100.0)
+                img.close()
+                os.remove(temp_img_path)
                 total = 1
             except Exception as e:
+                # Dọn dẹp file tạm nếu có lỗi
+                for p in [temp_img_path, path]:
+                    if os.path.exists(p):
+                        try: os.remove(p)
+                        except: pass
                 return jsonify({"error": f"Lỗi chuyển ảnh {f.filename}: {e}"}), 400
 
         files_db[file_id] = {
