@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 app.py – Trạm Xử Lý PDF Chuyên Nghiệp v3.0 (Web App)
-Backend Flask – xử lý PDF: gộp, tách, xuất ảnh, chuyển Word (OCR)
+Backend Flask – xử lý PDF: gộp, tách, xuất ảnh, chuyển Word (OCR) 
 """
 
 import os
