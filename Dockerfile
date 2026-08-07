@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy toàn bộ code lên
 COPY . .
+ENV PORT=8080
+EXPOSE 8080
 
 # Dùng $PORT do Railway cấp (mặc định 8080 nếu không có)
 # --timeout 120: tránh timeout khi xử lý file PDF lớn
