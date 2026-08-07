@@ -64,7 +64,7 @@
 
     <!-- File List -->
     <div class="file-list-card">
-      <div class="file-list-header">📋 Danh sách File – kéo lên xuống chuyển vị trí, nhấp đúp để chọn trang</div>
+      <div class="file-list-header">📋 Danh sách File – ☑️ tick để chọn file xuất, nhấp đúp để chọn trang</div>
       <div id="fileListBody">
         <div class="empty-state" id="emptyState" onclick="triggerUpload()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
           <span class="empty-icon">📂</span>
@@ -73,7 +73,13 @@
         <table class="file-table hidden" id="fileTable">
           <thead>
             <tr>
-              <th style="width:40px">#</th>
+              <th style="width:36px; text-align:center">
+                <input type="checkbox" id="selectAllFilesChk"
+                  title="Chọn/Bỏ chọn tất cả"
+                  style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary)"
+                  onchange="toggleSelectAllFiles(this)">
+              </th>
+              <th style="width:36px">#</th>
               <th>Tên File</th>
               <th style="width:130px; white-space:nowrap;">Tổng trang</th>
               <th>Trang được chọn</th>
@@ -92,6 +98,7 @@
         <div class="thumb-header-actions">
           <button class="btn-select-all" onclick="selectAllThumbs()">Chọn tất cả</button>
           <button class="btn-deselect-all" onclick="deselectAllThumbs()">Bỏ chọn tất cả</button>
+          <button class="btn-cancel-thumb" onclick="cancelThumbSelection()">✖ Hủy</button>
           <button class="btn-confirm" onclick="confirmThumbSelection()">✅ Xác nhận</button>
         </div>
       </div>
@@ -135,6 +142,11 @@
       <span class="toggle-label">Tối ưu & Nén dung lượng</span>
     </label>
     <div class="toggle-hint">Tự động nén khi Gộp/Tách file</div>
+
+    <div style="margin-top: auto; padding-top: 20px; text-align: center;">
+      <img src="https://hits.sh/pdf.kdcpc1.com.svg?style=flat&label=L%C6%B0%E1%BB%A3t%20xem&color=10b981&labelColor=1e293b"
+           alt="Lượt xem" style="border-radius: 4px;">
+    </div>
   </aside>
 
 </div>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 app.py – Trạm Xử Lý PDF Chuyên Nghiệp v3.0 (Web App)
-Backend Flask – xử lý PDF: gộp, tách, xuất ảnh, chuyển Word (OCR)
+Backend Flask – xử lý PDF: gộp, tách, xuất ảnh, chuyển Word (OCR) 
 """
 
 import os
@@ -92,14 +92,27 @@ def upload():
                 os.remove(path)
                 return jsonify({"error": f"Lỗi đọc {f.filename}: {e}"}), 400
         else:
-            # Là file ảnh -> Chuyển thành PDF 1 trang
+            # Là file ảnh -> Lưu tạm, đọc vào bộ nhớ, xóa tạm, rồi chuyển thành PDF
             try:
-                img = Image.open(f)
+                temp_img_path = os.path.join(UPLOAD_DIR, f"{file_id}_img{os.path.splitext(fname_lower)[1]}")
+                f.save(temp_img_path)
+                # Đọc toàn bộ nội dung vào BytesIO rồi đóng/xóa file ngay
+                # → tránh WinError 32 (Pillow giữ handle file trên Windows)
+                with open(temp_img_path, 'rb') as tmp:
+                    img_bytes = io.BytesIO(tmp.read())
+                os.remove(temp_img_path)   # xóa ngay khi không còn handle nào
+                img = Image.open(img_bytes)
                 img_converted = img.convert('RGB')
                 img_converted.save(path, "PDF", resolution=100.0)
                 total = 1
             except Exception as e:
+                # Dọn dẹp file tạm nếu có lỗi
+                for p in [temp_img_path, path]:
+                    if os.path.exists(p):
+                        try: os.remove(p)
+                        except: pass
                 return jsonify({"error": f"Lỗi chuyển ảnh {f.filename}: {e}"}), 400
+
 
         files_db[file_id] = {
             "path":        path,

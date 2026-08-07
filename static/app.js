@@ -5,15 +5,17 @@
 
 // ─── State ───
 const state = {
-  files: [],          // [{file_id, name, total_pages, selected_pages: Set}]
-  mergeOrder: [],     // [{file_id, pageIdx}] – thứ tự trang khi gộp (cập nhật sau Xác nhận)
-  selectedIndex: -1,  // index trong state.files của file đang được chọn
-  thumbMode: null,    // null | "single" | "all"
+  files: [],            // [{file_id, name, total_pages, selected_pages: Set}]
+  mergeOrder: [],       // [{file_id, pageIdx}] – thứ tự trang khi gộp (cập nhật sau Xác nhận)
+  selectedIndex: -1,    // index file dùng cho nhấp đúp mở page picker
+  selectedIndices: new Set(), // Set<number> – các file được chọn để Xuất (multi-select)
+  thumbMode: null,      // null | "single" | "all"
 };
 
 // ─── Helpers ───
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
+const escHtml = (s) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
 function toast(msg, type = "info") {
   const box = document.createElement("div");
@@ -96,6 +98,7 @@ async function handleFiles(fileList) {
       });
     }
     state.mergeOrder = []; // Reset thứ tự sắp xếp khi thêm file mới
+    state.selectedIndices = new Set(); // Reset multi-select
     renderFileList();
     toast(`✅ Đã thêm ${results.length} file!`, "success");
   } catch (e) {
@@ -126,10 +129,13 @@ function renderFileList() {
   state.files.forEach((f, idx) => {
     const tr = document.createElement("tr");
     tr.draggable = true;
-    if (idx === state.selectedIndex) tr.classList.add("selected");
-    
-    tr.onclick = () => { state.selectedIndex = idx; renderFileList(); };
-    tr.ondblclick = () => { state.selectedIndex = idx; renderFileList(); showSinglePicker(); };
+    if (state.selectedIndices.has(idx)) tr.classList.add("selected");
+
+    // Chỉ nhấp đúp để mở picker chọn trang
+    tr.ondblclick = () => {
+      state.selectedIndex = idx;
+      showSinglePicker();
+    };
 
     // Drag & Drop events
     tr.ondragstart = (e) => {
@@ -140,25 +146,19 @@ function renderFileList() {
       e.preventDefault();
       if (idx !== draggedFileIndex) tr.classList.add("drag-over");
     };
-    tr.ondragleave = (e) => {
-      tr.classList.remove("drag-over");
-    };
-    tr.ondragover = (e) => {
-      e.preventDefault();
-    };
+    tr.ondragleave = (e) => { tr.classList.remove("drag-over"); };
+    tr.ondragover  = (e) => { e.preventDefault(); };
     tr.ondrop = (e) => {
       e.preventDefault();
       tr.classList.remove("drag-over");
       if (draggedFileIndex === null || draggedFileIndex === idx) return;
-      
       const movedItem = state.files.splice(draggedFileIndex, 1)[0];
       state.files.splice(idx, 0, movedItem);
-      
       const selectedFile = state.files[state.selectedIndex];
       state.selectedIndex = state.files.indexOf(movedItem === selectedFile ? movedItem : state.files.find(f => f === selectedFile));
-      
       draggedFileIndex = null;
-      state.mergeOrder = []; // Reset thứ tự sắp xếp trang khi đổi thứ tự file
+      state.mergeOrder = [];
+      state.selectedIndices = new Set();
       renderFileList();
     };
     tr.ondragend = (e) => {
@@ -166,21 +166,82 @@ function renderFileList() {
       draggedFileIndex = null;
     };
 
-    const disp = indicesToDisplay(f.selected_pages, f.total_pages);
+    const disp  = indicesToDisplay(f.selected_pages, f.total_pages);
     const badge = badgeClass(f.selected_pages, f.total_pages);
+    const isChecked = state.selectedIndices.has(idx);
+
+    // Checkbox td (ngăn click lan ra tr khi click checkbox)
+    const tdChk = document.createElement("td");
+    tdChk.style.cssText = "text-align:center;padding:0 6px";
+    tdChk.innerHTML = `<input type="checkbox" ${isChecked ? "checked" : ""}
+      style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary)"
+      onclick="event.stopPropagation()"
+      onchange="toggleFileSelect(${idx}, this)">`;
 
     tr.innerHTML = `
       <td style="text-align:center;font-weight:600;color:var(--text-secondary)">${idx + 1}</td>
-      <td style="font-weight:600">${f.name}</td>
+      <td style="font-weight:600">${escHtml(f.name)}</td>
       <td style="text-align:center">${f.total_pages}</td>
       <td><span class="badge ${badge}">${disp}</span></td>
       <td style="text-align:center">
         <button class="btn-delete-row" title="Xóa file này" onclick="event.stopPropagation(); deleteFileIdx(${idx})">❌</button>
       </td>
     `;
+    tr.insertBefore(tdChk, tr.firstChild);
     tbody.appendChild(tr);
   });
+
+  // Sync trạng thái header checkbox
+  syncSelectAllCheckbox();
 }
+
+// Sync header checkbox: checked / indeterminate / unchecked
+function syncSelectAllCheckbox() {
+  const chk = $("#selectAllFilesChk");
+  if (!chk) return;
+  const total = state.files.length;
+  const selected = state.selectedIndices.size;
+  if (selected === 0) {
+    chk.checked = false;
+    chk.indeterminate = false;
+  } else if (selected === total) {
+    chk.checked = true;
+    chk.indeterminate = false;
+  } else {
+    chk.checked = false;
+    chk.indeterminate = true; // Một phần được chọn
+  }
+}
+
+// Toggle chọn/bỏ chọn từng file qua checkbox
+function toggleFileSelect(idx, chkEl) {
+  if (chkEl.checked) {
+    state.selectedIndices.add(idx);
+  } else {
+    state.selectedIndices.delete(idx);
+  }
+  state.selectedIndex = idx;
+  // Cập nhật highlight row và header checkbox mà không render lại toàn bộ
+  const rows = $("#fileTableBody")?.querySelectorAll("tr");
+  if (rows && rows[idx]) {
+    rows[idx].classList.toggle("selected", chkEl.checked);
+  }
+  syncSelectAllCheckbox();
+}
+
+// Chọn tất cả / Bỏ chọn tất cả qua header checkbox
+function toggleSelectAllFiles(chkEl) {
+  if (chkEl.checked) {
+    // Chọn tất cả
+    state.selectedIndices = new Set(state.files.map((_, i) => i));
+  } else {
+    // Bỏ chọn tất cả
+    state.selectedIndices = new Set();
+  }
+  renderFileList();
+}
+
+
 
 // ─── Delete ───
 
@@ -189,15 +250,25 @@ async function deleteFileIdx(idx) {
   const f = state.files[idx];
   await fetch(`/api/files/${f.file_id}`, { method: "DELETE" });
   state.files.splice(idx, 1);
-  
+
+  // Cập nhật selectedIndex
   if (state.selectedIndex === idx) {
     state.selectedIndex = Math.min(idx, state.files.length - 1);
   } else if (state.selectedIndex > idx) {
     state.selectedIndex--;
   }
-  
   if (state.files.length === 0) state.selectedIndex = -1;
-  state.mergeOrder = []; // Reset thứ tự sắp xếp khi xóa file
+
+  // Cập nhật selectedIndices: xóa idx bị xóa, dịch các idx lớn hơn xuống 1
+  const newSel = new Set();
+  for (const i of state.selectedIndices) {
+    if (i < idx) newSel.add(i);
+    else if (i > idx) newSel.add(i - 1);
+    // i === idx: bỏ qua (file này đã bị xóa)
+  }
+  state.selectedIndices = newSel;
+
+  state.mergeOrder = [];
   renderFileList();
   hideThumbArea();
   toast("Đã xóa file.", "success");
@@ -209,7 +280,8 @@ async function clearAll() {
   await fetch("/api/files/clear", { method: "DELETE" });
   state.files = [];
   state.selectedIndex = -1;
-  state.mergeOrder = []; // Reset thứ tự sắp xếp
+  state.selectedIndices = new Set();
+  state.mergeOrder = [];
   renderFileList();
   hideThumbArea();
   toast("Đã xóa tất cả.", "success");
@@ -220,6 +292,12 @@ function hideThumbArea() {
   $("#thumbArea").classList.add("hidden");
   $(".file-list-card").classList.remove("hidden");
   state.thumbMode = null;
+}
+
+// Huỷ chọn trang – đóng picker mà không lưu thay đổi
+function cancelThumbSelection() {
+  hideThumbArea();
+  toast("Đã huỷ, không có thay đổi nào được lưu.", "info");
 }
 
 function showSinglePicker() {
@@ -412,11 +490,13 @@ function updateCardState(card, cb, borderColor) {
 }
 
 function selectAllThumbs() {
-  $$("#thumbContent input[type=checkbox]").forEach(cb => {
+  $$("#thumbContent .thumb-card").forEach(card => {
+    const cb = card.querySelector("input[type=checkbox]");
+    if (!cb) return;
     cb.checked = true;
-    const card = cb.closest(".thumb-card");
-    card.classList.add("checked");
-    card.classList.remove("unchecked");
+    // Lấy borderColor từ style inline hiện tại hoặc dùng primary
+    const borderColor = card.style.borderColor || "var(--primary)";
+    updateCardState(card, cb, borderColor);
   });
 }
 
@@ -451,6 +531,10 @@ function confirmThumbSelection() {
     $$("#thumbContent input[type=checkbox]").forEach(cb => {
       if (cb.checked) f.selected_pages.add(parseInt(cb.dataset.pageIdx));
     });
+    // ── Single mode: reset mergeOrder để doMerge dùng tất cả file ──
+    // (tránh bỏ sót các file ảnh/PDF khác chưa qua picker)
+    state.mergeOrder = [];
+
   } else if (state.thumbMode === "all") {
     // Group by file
     $$("#thumbContent input[type=checkbox]").forEach(cb => {
@@ -462,19 +546,20 @@ function confirmThumbSelection() {
         state.files[fIdx].selected_pages.delete(pIdx);
       }
     });
-  }
 
-  // ── Xây dựng mergeOrder từ thứ tự DOM thực tế (sau khi kéo thả / di chuyển) ──
-  state.mergeOrder = [];
-  document.querySelectorAll("#thumbContent .thumb-card").forEach(card => {
-    const cb = card.querySelector("input[type=checkbox]");
-    if (cb && cb.checked) {
-      state.mergeOrder.push({
-        file_id: card.dataset.fileId,
-        pageIdx: parseInt(card.dataset.pageIdx),
-      });
-    }
-  });
+    // ── All mode: xây dựng mergeOrder từ thứ tự DOM thực tế ──
+    // (bao gồm mọi file, giữ thứ tự kéo thả/di chuyển của người dùng)
+    state.mergeOrder = [];
+    document.querySelectorAll("#thumbContent .thumb-card").forEach(card => {
+      const cb = card.querySelector("input[type=checkbox]");
+      if (cb && cb.checked) {
+        state.mergeOrder.push({
+          file_id: card.dataset.fileId,
+          pageIdx: parseInt(card.dataset.pageIdx),
+        });
+      }
+    });
+  }
 
   renderFileList();
   hideThumbArea();
@@ -573,24 +658,77 @@ async function doSplit() {
   }
 }
 
-async function doImages() {
-  const f = getSelectedFile();
-  if (!f) return;
-  const pages = [...f.selected_pages].sort((a, b) => a - b);
-  if (pages.length === 0) return toast("Không có trang nào được chọn!", "warning");
 
-  showLoading(`Đang xuất ${pages.length} ảnh…`);
+// ── Hàm trợ giúp: lấy danh sách file để xuất ──
+// - Nếu đang chọn 1+ file (selectedIndices) → chỉ xuất các file đó
+// - Nếu không chọn file nào → xuất tất cả
+function getFilesWithPages() {
+  if (state.selectedIndices.size > 0) {
+    // Chỉ xuất các file được chọn (highlight xanh)
+    const list = [...state.selectedIndices]
+      .sort((a, b) => a - b)
+      .map(idx => {
+        const f = state.files[idx];
+        if (!f) return null;
+        const pages = [...f.selected_pages].sort((a, b) => a - b);
+        return pages.length > 0 ? { f, pages } : null;
+      })
+      .filter(Boolean);
+    if (list.length === 0) {
+      toast("File được chọn không có trang nào!", "warning");
+      return null;
+    }
+    return list;
+  }
+  // Không chọn file nào → lấy tất cả
+  const list = state.files
+    .map(f => ({ f, pages: [...f.selected_pages].sort((a, b) => a - b) }))
+    .filter(({ pages }) => pages.length > 0);
+  if (list.length === 0) {
+    toast("Không có trang nào được chọn!", "warning");
+    return null;
+  }
+  return list;
+}
+
+async function doImages() {
+  const targets = getFilesWithPages();
+  if (!targets) return;
+  const totalPages = targets.reduce((s, { pages }) => s + pages.length, 0);
+
+  showLoading(`Đang xuất ${totalPages} ảnh từ ${targets.length} file…`);
   try {
-    const resp = await fetch("/api/images", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: f.file_id, pages }),
-    });
-    if (!resp.ok) throw new Error((await resp.json()).error);
-    const blob = await resp.blob();
-    const base = f.name.replace(/\.pdf$/i, "");
-    downloadBlob(blob, `${base}_anh.zip`);
-    toast(`✅ Đã xuất ${pages.length} ảnh!`, "success");
+    // Với 1 file: tải thẳng ZIP của file đó
+    if (targets.length === 1) {
+      const { f, pages } = targets[0];
+      const resp = await fetch("/api/images", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: f.file_id, pages }),
+      });
+      if (!resp.ok) throw new Error((await resp.json()).error);
+      const blob = await resp.blob();
+      downloadBlob(blob, `${f.name.replace(/\.\w+$/i, "")}_anh.zip`);
+    } else {
+      // Nhiều file: gộp tất cả ảnh vào 1 ZIP bằng JSZip
+      const { default: JSZip } = await importJSZip();
+      const zip = new JSZip();
+      for (const { f, pages } of targets) {
+        const resp = await fetch("/api/images", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_id: f.file_id, pages }),
+        });
+        if (!resp.ok) throw new Error((await resp.json()).error);
+        const innerZip = await JSZip.loadAsync(await resp.arrayBuffer());
+        const base = f.name.replace(/\.\w+$/i, "");
+        await Promise.all(Object.keys(innerZip.files).map(async name => {
+          const data = await innerZip.files[name].async("arraybuffer");
+          zip.file(`${base}/${name}`, data);
+        }));
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(blob, "xuat_anh.zip");
+    }
+    toast(`✅ Đã xuất ${totalPages} ảnh thành công!`, "success");
   } catch (e) {
     toast(`❌ Lỗi: ${e.message}`, "error");
   } finally {
@@ -599,28 +737,36 @@ async function doImages() {
 }
 
 async function doWord() {
-  const f = getSelectedFile();
-  if (!f) return;
-  const pages = [...f.selected_pages].sort((a, b) => a - b);
-  if (pages.length === 0) return toast("Không có trang nào được chọn!", "warning");
-  const ocrModeElement = $("#ocrMode");
-  const ocr_mode = ocrModeElement ? ocrModeElement.value : "none";
+  const targets = getFilesWithPages();
+  if (!targets) return;
+  const ocr_mode = $("#ocrMode")?.value || "none";
+  let modeText = ocr_mode === "basic" ? " (OCR Thường)" : ocr_mode === "advanced" ? " (OCR Nâng cao)" : "";
+  const totalPages = targets.reduce((s, { pages }) => s + pages.length, 0);
 
-  let modeText = "";
-  if (ocr_mode === "basic") modeText = " (OCR Thường)";
-  if (ocr_mode === "advanced") modeText = " (OCR Nâng cao)";
-
-  showLoading(`Đang chuyển ${pages.length} trang sang Word${modeText}…`);
+  showLoading(`Đang chuyển ${totalPages} trang sang Word${modeText}…`);
   try {
-    const resp = await fetch("/api/word", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: f.file_id, pages, ocr_mode }),
-    });
-    if (!resp.ok) throw new Error((await resp.json()).error);
-    const blob = await resp.blob();
-    const base = f.name.replace(/\.pdf$/i, "");
-    downloadBlob(blob, `${base}.docx`);
+    if (targets.length === 1) {
+      const { f, pages } = targets[0];
+      const resp = await fetch("/api/word", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: f.file_id, pages, ocr_mode }),
+      });
+      if (!resp.ok) throw new Error((await resp.json()).error);
+      downloadBlob(await resp.blob(), `${f.name.replace(/\.\w+$/i, "")}.docx`);
+    } else {
+      const { default: JSZip } = await importJSZip();
+      const zip = new JSZip();
+      for (const { f, pages } of targets) {
+        const resp = await fetch("/api/word", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_id: f.file_id, pages, ocr_mode }),
+        });
+        if (!resp.ok) throw new Error((await resp.json()).error);
+        const buf = await resp.arrayBuffer();
+        zip.file(`${f.name.replace(/\.\w+$/i, "")}.docx`, buf);
+      }
+      downloadBlob(await zip.generateAsync({ type: "blob" }), "xuat_word.zip");
+    }
     toast("✅ Đã chuyển sang Word thành công!", "success");
   } catch (e) {
     toast(`❌ Lỗi: ${e.message}`, "error");
@@ -628,6 +774,89 @@ async function doWord() {
     hideLoading();
   }
 }
+
+async function doExcel() {
+  const targets = getFilesWithPages();
+  if (!targets) return;
+  const totalPages = targets.reduce((s, { pages }) => s + pages.length, 0);
+
+  showLoading(`Đang xuất ${totalPages} trang sang Excel…`);
+  try {
+    if (targets.length === 1) {
+      const { f, pages } = targets[0];
+      const resp = await fetch("/api/excel", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: f.file_id, pages }),
+      });
+      if (!resp.ok) throw new Error((await resp.json()).error);
+      downloadBlob(await resp.blob(), `${f.name.replace(/\.\w+$/i, "")}.xlsx`);
+    } else {
+      const { default: JSZip } = await importJSZip();
+      const zip = new JSZip();
+      for (const { f, pages } of targets) {
+        const resp = await fetch("/api/excel", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_id: f.file_id, pages }),
+        });
+        if (!resp.ok) throw new Error((await resp.json()).error);
+        zip.file(`${f.name.replace(/\.\w+$/i, "")}.xlsx`, await resp.arrayBuffer());
+      }
+      downloadBlob(await zip.generateAsync({ type: "blob" }), "xuat_excel.zip");
+    }
+    toast("✅ Đã xuất sang Excel thành công!", "success");
+  } catch (e) {
+    toast(`❌ Lỗi: ${e.message}`, "error");
+  } finally {
+    hideLoading();
+  }
+}
+
+async function doCompress() {
+  const targets = getFilesWithPages();
+  if (!targets) return;
+  const totalPages = targets.reduce((s, { pages }) => s + pages.length, 0);
+
+  showLoading(`Đang nén ${totalPages} trang từ ${targets.length} file…`);
+  try {
+    if (targets.length === 1) {
+      const { f, pages } = targets[0];
+      const resp = await fetch("/api/compress", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: f.file_id, pages }),
+      });
+      if (!resp.ok) throw new Error((await resp.json()).error);
+      downloadBlob(await resp.blob(), `${f.name.replace(/\.\w+$/i, "")}_nen.pdf`);
+    } else {
+      // Nhiều file: nén từng file rồi đóng gói vào ZIP
+      const { default: JSZip } = await importJSZip();
+      const zip = new JSZip();
+      for (const { f, pages } of targets) {
+        const resp = await fetch("/api/compress", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_id: f.file_id, pages }),
+        });
+        if (!resp.ok) throw new Error((await resp.json()).error);
+        zip.file(`${f.name.replace(/\.\w+$/i, "")}_nen.pdf`, await resp.arrayBuffer());
+      }
+      downloadBlob(await zip.generateAsync({ type: "blob" }), "nen_pdf.zip");
+    }
+    toast("✅ Đã nén xong!", "success");
+  } catch (e) {
+    toast(`❌ Lỗi: ${e.message}`, "error");
+  } finally {
+    hideLoading();
+  }
+}
+
+// ── Lazy-load JSZip từ CDN (chỉ khi cần xử lý nhiều file) ──
+let _jszipPromise = null;
+function importJSZip() {
+  if (!_jszipPromise) {
+    _jszipPromise = import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");
+  }
+  return _jszipPromise;
+}
+
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -640,52 +869,4 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-async function doCompress() {
-  const f = getSelectedFile();
-  if (!f) return;
-  const pages = [...f.selected_pages].sort((a, b) => a - b);
-  if (pages.length === 0) return toast("Không có trang nào được chọn!", "warning");
 
-  showLoading(`Đang nén file (giữ lại ${pages.length} trang)…`);
-  try {
-    const resp = await fetch("/api/compress", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: f.file_id, pages }),
-    });
-    if (!resp.ok) throw new Error((await resp.json()).error);
-    const blob = await resp.blob();
-    const base = f.name.replace(/\.pdf$/i, "");
-    downloadBlob(blob, `${base}_nen.pdf`);
-    toast("✅ Đã nén xong!", "success");
-  } catch (e) {
-    toast(`❌ Lỗi: ${e.message}`, "error");
-  } finally {
-    hideLoading();
-  }
-}
-
-async function doExcel() {
-  const f = getSelectedFile();
-  if (!f) return;
-  const pages = [...f.selected_pages].sort((a, b) => a - b);
-  if (pages.length === 0) return toast("Không có trang nào được chọn!", "warning");
-
-  showLoading(`Đang xuất ${pages.length} trang sang Excel…`);
-  try {
-    const resp = await fetch("/api/excel", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: f.file_id, pages }),
-    });
-    if (!resp.ok) throw new Error((await resp.json()).error);
-    const blob = await resp.blob();
-    const base = f.name.replace(/\.pdf$/i, "");
-    downloadBlob(blob, `${base}.xlsx`);
-    toast("✅ Đã xuất sang Excel thành công!", "success");
-  } catch (e) {
-    toast(`❌ Lỗi: ${e.message}`, "error");
-  } finally {
-    hideLoading();
-  }
-}

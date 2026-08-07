@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy toàn bộ code lên
 COPY . .
 
-# Chạy Flask bằng Gunicorn. 
-# CHÚ Ý: Đổi "app:app" nếu file của bạn không tên là app.py. 
-# Ví dụ: nếu file là main.py, đổi thành "main:app"
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:10000"]
+# Dùng $PORT do Railway cấp (mặc định 8080 nếu không có)
+# --timeout 120: tránh timeout khi xử lý file PDF lớn
+# --workers 1: tiết kiệm RAM trên Railway free tier
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --timeout 120 --workers 1"]
