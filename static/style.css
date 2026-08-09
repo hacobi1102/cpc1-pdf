@@ -323,7 +323,7 @@ body {
 .empty-state:hover {
   background: var(--card-hover);
   border-color: var(--primary-light);
-  color: var(--text-primary);
+  color: var(--text);
 }
 .empty-state.drag-over {
   border-color: var(--primary);

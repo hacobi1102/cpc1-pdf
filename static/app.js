@@ -599,10 +599,12 @@ async function doMerge() {
       files: chunks,
     };
   } else {
-    // ── Fallback: thứ tự mặc định (file theo danh sách, trang sorted) ──
+    // ── Fallback: dùng getFilesWithPages() – chỉ gộp file được chọn (hoặc tất cả) ──
+    const targets = getFilesWithPages();
+    if (!targets) return;
     payload = {
       compress,
-      files: state.files.map(f => ({
+      files: targets.map(({ f }) => ({
         file_id: f.file_id,
         pages: [...f.selected_pages].sort((a, b) => a - b),
       })),
@@ -632,25 +634,45 @@ async function doMerge() {
 }
 
 async function doSplit() {
-  const f = getSelectedFile();
-  if (!f) return;
-  const pages = [...f.selected_pages].sort((a, b) => a - b);
-  if (pages.length === 0) return toast("Không có trang nào được chọn!", "warning");
-
+  const targets = getFilesWithPages();
+  if (!targets) return;
   const compress = $("#compressToggle")?.checked || false;
+  const totalPages = targets.reduce((s, { pages }) => s + pages.length, 0);
 
-  showLoading(`Đang tách ${pages.length} trang…`);
+  showLoading(`Đang tách ${totalPages} trang từ ${targets.length} file…`);
   try {
-    const resp = await fetch("/api/split", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: f.file_id, pages, compress: compress }),
-    });
-    if (!resp.ok) throw new Error((await resp.json()).error);
-    const blob = await resp.blob();
-    const base = f.name.replace(/\.pdf$/i, "");
-    downloadBlob(blob, `${base}_tach.zip`);
-    toast(`✅ Đã tách ${pages.length} trang!`, "success");
+    if (targets.length === 1) {
+      const { f, pages } = targets[0];
+      const resp = await fetch("/api/split", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: f.file_id, pages, compress }),
+      });
+      if (!resp.ok) throw new Error((await resp.json()).error);
+      const blob = await resp.blob();
+      const base = f.name.replace(/\.pdf$/i, "");
+      downloadBlob(blob, `${base}_tach.zip`);
+    } else {
+      // Nhiều file: tách từng file rồi gộp vào 1 ZIP
+      const zip = getJSZip();
+      if (!zip) return;
+      for (const { f, pages } of targets) {
+        const resp = await fetch("/api/split", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_id: f.file_id, pages, compress }),
+        });
+        if (!resp.ok) throw new Error((await resp.json()).error);
+        const innerZip = await JSZip.loadAsync(await resp.arrayBuffer());
+        const base = f.name.replace(/\.\w+$/i, "");
+        await Promise.all(Object.keys(innerZip.files).map(async name => {
+          const data = await innerZip.files[name].async("arraybuffer");
+          zip.file(`${base}/${name}`, data);
+        }));
+      }
+      downloadBlob(await zip.generateAsync({ type: "blob" }), "tach_pdf.zip");
+    }
+    toast(`✅ Đã tách ${totalPages} trang!`, "success");
   } catch (e) {
     toast(`❌ Lỗi: ${e.message}`, "error");
   } finally {
@@ -710,8 +732,8 @@ async function doImages() {
       downloadBlob(blob, `${f.name.replace(/\.\w+$/i, "")}_anh.zip`);
     } else {
       // Nhiều file: gộp tất cả ảnh vào 1 ZIP bằng JSZip
-      const { default: JSZip } = await importJSZip();
-      const zip = new JSZip();
+      const zip = getJSZip();
+      if (!zip) return;
       for (const { f, pages } of targets) {
         const resp = await fetch("/api/images", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -754,8 +776,8 @@ async function doWord() {
       if (!resp.ok) throw new Error((await resp.json()).error);
       downloadBlob(await resp.blob(), `${f.name.replace(/\.\w+$/i, "")}.docx`);
     } else {
-      const { default: JSZip } = await importJSZip();
-      const zip = new JSZip();
+      const zip = getJSZip();
+      if (!zip) return;
       for (const { f, pages } of targets) {
         const resp = await fetch("/api/word", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -791,8 +813,8 @@ async function doExcel() {
       if (!resp.ok) throw new Error((await resp.json()).error);
       downloadBlob(await resp.blob(), `${f.name.replace(/\.\w+$/i, "")}.xlsx`);
     } else {
-      const { default: JSZip } = await importJSZip();
-      const zip = new JSZip();
+      const zip = getJSZip();
+      if (!zip) return;
       for (const { f, pages } of targets) {
         const resp = await fetch("/api/excel", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -828,8 +850,8 @@ async function doCompress() {
       downloadBlob(await resp.blob(), `${f.name.replace(/\.\w+$/i, "")}_nen.pdf`);
     } else {
       // Nhiều file: nén từng file rồi đóng gói vào ZIP
-      const { default: JSZip } = await importJSZip();
-      const zip = new JSZip();
+      const zip = getJSZip();
+      if (!zip) return;
       for (const { f, pages } of targets) {
         const resp = await fetch("/api/compress", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -848,13 +870,14 @@ async function doCompress() {
   }
 }
 
-// ── Lazy-load JSZip từ CDN (chỉ khi cần xử lý nhiều file) ──
-let _jszipPromise = null;
-function importJSZip() {
-  if (!_jszipPromise) {
-    _jszipPromise = import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");
+// ── JSZip helper (loaded từ /static/jszip.min.js) ──
+function getJSZip() {
+  if (typeof JSZip === "undefined") {
+    toast("❌ Không tải được thư viện JSZip. Vui lòng tải lại trang.", "error");
+    hideLoading();
+    return null;
   }
-  return _jszipPromise;
+  return new JSZip();
 }
 
 
