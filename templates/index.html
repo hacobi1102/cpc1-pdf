@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="Trạm Xử Lý PDF CPC1 – Gộp, Tách, Xuất ảnh, Chuyển Word OCR Tiếng Việt">
+  <meta name="theme-color" content="#03aaad">
   <title>Trạm Xử Lý PDF CPC1</title>
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
@@ -64,7 +65,7 @@
 
     <!-- File List -->
     <div class="file-list-card">
-      <div class="file-list-header">📋 Danh sách File – ☑️ tick để chọn file xuất, nhấp đúp để chọn trang</div>
+      <div class="file-list-header">📋 Danh sách File – ☑️ tick để chọn file xuất, bấm ✏️ để chọn trang</div>
       <div id="fileListBody">
         <div class="empty-state" id="emptyState" onclick="triggerUpload()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
           <span class="empty-icon">📂</span>
@@ -81,9 +82,9 @@
               </th>
               <th style="width:36px">#</th>
               <th>Tên File</th>
-              <th style="width:130px; white-space:nowrap;">Tổng trang</th>
+              <th style="width:50px; text-align:center">Trang</th>
               <th>Trang được chọn</th>
-              <th style="width:50px"></th>
+              <th style="width:100px"></th>
             </tr>
           </thead>
           <tbody id="fileTableBody"></tbody>
@@ -168,7 +169,8 @@
 </div>
 
 <!-- Polyfill hỗ trợ Drag & Drop trên màn hình cảm ứng điện thoại -->
-<script src="https://unpkg.com/drag-drop-touch"></script>
+<script src="https://unpkg.com/drag-drop-touch@2.1.0/dist/drag-drop-touch.esm.min.js?module" type="module"></script>
+<script src="/static/jszip.min.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

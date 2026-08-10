@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 app.py – Trạm Xử Lý PDF Chuyên Nghiệp v3.0 (Web App)
-Backend Flask – xử lý PDF: gộp, tách, xuất ảnh, chuyển Word (OCR) 
+Backend Flask – xử lý PDF: gộp, tách, xuất ảnh, chuyển Word (OCR)
 """
 
 import os
@@ -11,20 +11,27 @@ import uuid
 import zipfile
 import atexit
 import shutil
+import time
+import threading
 
 from flask import Flask, request, jsonify, send_file, render_template
 
 from pypdf import PdfReader, PdfWriter
 
 # ─── Thư viện tuỳ chọn ───
-HAS_FITZ = True
-HAS_OCR  = True
+HAS_FITZ  = True
+HAS_OCR   = True
+HAS_PIL   = True
 
 try:
     import fitz
-    from PIL import Image
 except ImportError:
     HAS_FITZ = False
+
+try:
+    from PIL import Image
+except ImportError:
+    HAS_PIL = False
 
 try:
     import pytesseract
@@ -58,8 +65,32 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # Dọn dẹp thư mục tạm khi tắt server
 atexit.register(lambda: shutil.rmtree(UPLOAD_DIR, ignore_errors=True))
 
-# Registry lưu thông tin file đã upload  { file_id -> {path, name, total_pages} }
+# Registry lưu thông tin file đã upload  { file_id -> {path, name, total_pages, created_at} }
+# ⚠️ Lưu ý: files_db là in-memory, chỉ hoạt động đúng với --workers 1
 files_db: dict[str, dict] = {}
+
+# ─── Background cleanup: dọn file cũ hơn 1 giờ, chạy mỗi 15 phút ───
+FILE_TTL_SECONDS = 3600       # 1 giờ
+CLEANUP_INTERVAL  = 900       # 15 phút
+
+def _cleanup_old_files():
+    while True:
+        time.sleep(CLEANUP_INTERVAL)
+        now = time.time()
+        expired = [fid for fid, info in files_db.items()
+                   if now - info.get("created_at", now) > FILE_TTL_SECONDS]
+        for fid in expired:
+            info = files_db.pop(fid, None)
+            if info:
+                try:
+                    os.remove(info["path"])
+                except OSError:
+                    pass
+        if expired:
+            print(f"[Cleanup] Đã dọn {len(expired)} file cũ.")
+
+_cleanup_thread = threading.Thread(target=_cleanup_old_files, daemon=True)
+_cleanup_thread.start()
 
 
 # ─── Routes ───
@@ -93,6 +124,9 @@ def upload():
                 return jsonify({"error": f"Lỗi đọc {f.filename}: {e}"}), 400
         else:
             # Là file ảnh -> Lưu tạm, đọc vào bộ nhớ, xóa tạm, rồi chuyển thành PDF
+            if not HAS_PIL:
+                return jsonify({"error": "Cần cài Pillow để xử lý ảnh: pip install Pillow"}), 500
+            temp_img_path = None
             try:
                 temp_img_path = os.path.join(UPLOAD_DIR, f"{file_id}_img{os.path.splitext(fname_lower)[1]}")
                 f.save(temp_img_path)
@@ -108,9 +142,9 @@ def upload():
             except Exception as e:
                 # Dọn dẹp file tạm nếu có lỗi
                 for p in [temp_img_path, path]:
-                    if os.path.exists(p):
+                    if p and os.path.exists(p):
                         try: os.remove(p)
-                        except: pass
+                        except OSError: pass
                 return jsonify({"error": f"Lỗi chuyển ảnh {f.filename}: {e}"}), 400
 
 
@@ -118,6 +152,7 @@ def upload():
             "path":        path,
             "name":        f.filename,
             "total_pages": total,
+            "created_at":  time.time(),
         }
         results.append({
             "file_id":     file_id,
@@ -335,7 +370,7 @@ def to_word():
         finally:
             if os.path.exists(tmp_docx):
                 try: os.remove(tmp_docx)
-                except: pass
+                except OSError: pass
 
     elif ocr_mode == "basic":
         from docx import Document
@@ -430,7 +465,7 @@ def to_word():
             for path in [tmp_in_path, tmp_out_path, tmp_docx_path, tmp_out_path + "_fixed.pdf"]:
                 if os.path.exists(path):
                     try: os.remove(path)
-                    except: pass
+                    except OSError: pass
 
     buf.seek(0)
     return send_file(buf, as_attachment=True,

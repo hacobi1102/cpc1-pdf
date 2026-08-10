@@ -4,6 +4,9 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-vie \
+    ghostscript \
+    unpaper \
+    pngquant \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -14,6 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy toàn bộ code lên
 COPY . .
+ENV PORT=8080
+EXPOSE 8080
 
 # Dùng $PORT do Railway cấp (mặc định 8080 nếu không có)
 # --timeout 120: tránh timeout khi xử lý file PDF lớn
